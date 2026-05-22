@@ -9,6 +9,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import { CircularProgressbar } from 'react-circular-progressbar'
+import 'react-circular-progressbar/dist/styles.css'
 
 type Metrics = {
   currentPrice?: string
@@ -38,6 +40,43 @@ const districtMap: Record<string, string> = {
   트리마제: '11200',
 }
 
+function Gauge({
+  title,
+  value,
+  color,
+  suffix,
+}: {
+  title: string
+  value: number
+  color: string
+  suffix: string
+}) {
+  return (
+    <div className="bg-zinc-900 p-8 rounded">
+      <h2 className="text-xl mb-6">{title}</h2>
+
+      <div className="w-48 h-48 mx-auto">
+        <CircularProgressbar
+          value={value}
+          text={`${value}${suffix}`}
+          styles={{
+            path: {
+              stroke: color,
+            },
+            text: {
+              fill: '#ffffff',
+              fontSize: '18px',
+            },
+            trail: {
+              stroke: '#27272a',
+            },
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
 export default function Home() {
   const [district, setDistrict] = useState('11710')
   const [search, setSearch] = useState('')
@@ -53,6 +92,14 @@ export default function Home() {
     investmentScore: '-',
     opinion: '-',
   })
+
+  const bubbleNumber = parseInt(
+    metrics.bubbleRate?.replace('%', '') || '0'
+  )
+
+  const scoreNumber = parseInt(
+    metrics.investmentScore?.replace('점', '') || '0'
+  )
 
   async function searchApartments(keyword: string) {
     setSearch(keyword)
@@ -203,6 +250,22 @@ export default function Home() {
           <p>AI 의견</p>
           <h2 className="text-3xl">{metrics.opinion}</h2>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-5 mt-10">
+        <Gauge
+          title="버블 리스크"
+          value={bubbleNumber}
+          color="#ef4444"
+          suffix="%"
+        />
+
+        <Gauge
+          title="투자 점수"
+          value={scoreNumber}
+          color="#eab308"
+          suffix="점"
+        />
       </div>
 
       <div className="bg-zinc-900 p-8 rounded mt-10">
