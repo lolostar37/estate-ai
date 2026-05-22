@@ -73,7 +73,7 @@ export default function Home() {
     }
   }
 
-  async function handleAnalyze() {
+  async function runAnalyze(targetSearch: string, targetDistrict: string) {
     try {
       setLoading(true)
       setResult('분석중...')
@@ -81,7 +81,10 @@ export default function Home() {
       const response = await fetch('/api/analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ search, district }),
+        body: JSON.stringify({
+          search: targetSearch,
+          district: targetDistrict,
+        }),
       })
 
       const data = await response.json()
@@ -98,15 +101,20 @@ export default function Home() {
     }
   }
 
+  function handleAnalyze() {
+    runAnalyze(search, district)
+  }
+
   function selectSuggestion(item: Suggestion) {
+    const code = districtMap[item.name] || district
+
     setSearch(item.name)
-
-    const code = districtMap[item.name]
-    if (code) {
-      setDistrict(code)
-    }
-
+    setDistrict(code)
     setSuggestions([])
+
+    setTimeout(() => {
+      runAnalyze(item.name, code)
+    }, 100)
   }
 
   return (
@@ -160,7 +168,7 @@ export default function Home() {
         <button
           onClick={handleAnalyze}
           disabled={loading}
-          className="bg-yellow-500 px-8 rounded text-black font-bold"
+          className="bg-yellow-500 px-8 rounded text-black font-bold disabled:opacity-50"
         >
           {loading ? '분석중...' : 'AI 분석'}
         </button>
