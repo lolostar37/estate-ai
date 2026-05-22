@@ -4,84 +4,169 @@ import { XMLParser } from 'fast-xml-parser'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const search = body.search?.trim()
 
-    const key = process.env.MOLIT_API_KEY
+    const search = body.search?.trim()
+    const lawdCode = body.district
+
+    const molitKey = process.env.MOLIT_API_KEY
     const openaiKey = process.env.OPENAI_API_KEY
 
-    const lawdCode=body.district // 송파구
-    const dealYmd = '202604'
+    if (!search) {
+      return NextResponse.json({
+        result: '아파트명을 입력해주세요.',
+      })
+    }
 
-    const url =
-      'https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade' +
-      `?serviceKey=${encodeURIComponent(key || '')}` +
-      `&LAWD_CD=${lawdCode}` +
-      `&DEAL_YMD=${dealYmd}` +
-      `&pageNo=1` +
-      `&numOfRows=100`
+    const today = new Date()
+    const months: string[] = []
 
-    const response = await fetch(url, { cache: 'no-store' })
-    const xml = await response.text()
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(
+        today.getFullYear(),
+        today.getMonth() - i
+      )
 
-    const parser = new XMLParser()
-    const json = parser.parse(xml)
+      const year = d.getFullYear()
 
-    const rawItems = json?.response?.body?.items?.item || []
-    const items = Array.isArray(rawItems) ? rawItems : [rawItems]
+      const month = String(
+        d.getMonth() + 1
+      ).padStart(2, '0')
 
-    const filtered = items.filter((item: any) =>
-      String(item.aptNm || '').includes(search)
+      months.push(`${year}${month}`)
+    }
+
+    let allItems: any[] = []
+
+    for (const dealYmd of months) {
+      const url =
+        'https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade' +
+        `?serviceKey=${encodeURIComponent(
+          molitKey || ''
+        )}` +
+        `&LAWD_CD=${lawdCode}` +
+        `&DEAL_YMD=${dealYmd}` +
+        `&pageNo=1` +
+        `&numOfRows=100`
+
+      const response = await fetch(url, {
+        cache: 'no-store',
+      })
+
+      const xml = await response.text()
+
+      const parser = new XMLParser()
+
+      const json = parser.parse(xml)
+
+      const rawItems =
+        json?.response?.body?.items?.item || []
+
+      const items = Array.isArray(rawItems)
+        ? rawItems
+        : [rawItems]
+
+      allItems = [
+        ...allItems,
+        ...items,
+      ]
+    }
+
+    const filtered = allItems.filter(
+      (item: any) =>
+        String(item.aptNm || '')
+          .replace(/\s/g, '')
+          .includes(
+            search.replace(/\s/g, '')
+          )
     )
 
     if (filtered.length === 0) {
       return NextResponse.json({
-        result: `${search}의 2026년 4월 송파구 실거래 데이터를 찾을 수 없습니다.`,
+        result: `${search} 데이터를 찾을 수 없습니다.`,
       })
     }
 
-    const prices = filtered.map((item: any) =>
-      Number(String(item.dealAmount).replaceAll(',', ''))
+    const prices = filtered.map(
+      (item: any) =>
+        Number(
+          String(
+            item.dealAmount
+          ).replaceAll(',', '')
+        )
     )
 
-    const avgPriceManwon =
-      prices.reduce((sum: number, price: number) => sum + price, 0) /
-      prices.length
+    const averagePrice =
+      prices.reduce(
+        (sum: number, current: number) =>
+          sum + current,
+        0
+      ) / prices.length
 
-    const currentPrice = Math.round(avgPriceManwon / 10000 * 10) / 10
-    const fairValue = Math.round(currentPrice * 0.9 * 10) / 10
-    const bubbleRate = Math.round(((currentPrice - fairValue) / fairValue) * 100)
+    const currentPrice =
+      Math.round(
+        (averagePrice / 10000) * 10
+      ) / 10
 
-    const apt = filtered[0]
+    const fairValue =
+      Math.round(
+        currentPrice * 0.92 * 10
+      ) / 10
 
-    const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content:
-              '너는 대한민국 부동산 투자 분석가다. 반드시 제공된 국토부 실거래 데이터만 기준으로 분석해라.',
-          },
-          {
-            role: 'user',
-            content: `
-아파트명: ${apt.aptNm}
-지역: ${apt.umdNm}
-거래월: ${apt.dealYear}년 ${apt.dealMonth}월
-거래건수: ${filtered.length}건
-평균 실거래가: ${currentPrice}억
-AI 적정가 추정: ${fairValue}억
-버블률 추정: ${bubbleRate}%
-최근 거래층: ${apt.floor}층
-전용면적: ${apt.excluUseAr}㎡
-건축연도: ${apt.buildYear}년
+    const bubbleRate =
+      Math.round(
+        (
+          ((currentPrice - fairValue) /
+            fairValue) *
+          100
+        )
+      )
 
-위 데이터를 기준으로 아래 형식으로 분석해줘.
+    const opinion =
+      bubbleRate > 15
+        ? '보수 접근'
+        : bubbleRate > 7
+        ? '중립'
+        : '관심 권장'
+
+    const gptResponse = await fetch(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json',
+
+          Authorization:
+            `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content:
+                '너는 대한민국 부동산 투자 분석가다.',
+            },
+            {
+              role: 'user',
+              content: `
+
+아파트:
+${search}
+
+최근 거래:
+${currentPrice}억
+
+적정가:
+${fairValue}억
+
+버블률:
+${bubbleRate}%
+
+의견:
+${opinion}
+
+다음을 분석:
 
 1. 현재 시장 위치
 2. 가격 거품 여부
@@ -89,28 +174,39 @@ AI 적정가 추정: ${fairValue}억
 4. 실거주 가치
 5. 향후 전망
 6. 최종 의견
-`,
-          },
-        ],
-      }),
-    })
 
-    const gpt = await gptResponse.json()
+`,
+            },
+          ],
+        }),
+      }
+    )
+
+    const gpt =
+      await gptResponse.json()
 
     return NextResponse.json({
-      result: gpt.choices?.[0]?.message?.content || 'AI 응답이 없습니다.',
+      result:
+        gpt?.choices?.[0]
+          ?.message?.content ||
+        '응답 없음',
+
       metrics: {
-        currentPrice: `${currentPrice}억`,
-        fairValue: `${fairValue}억`,
-        bubbleRate: `${bubbleRate}%`,
-        opinion: bubbleRate > 10 ? '보수 접근' : '중립',
+        currentPrice:
+          `${currentPrice}억`,
+        fairValue:
+          `${fairValue}억`,
+        bubbleRate:
+          `${bubbleRate}%`,
+        opinion,
       },
     })
   } catch (error) {
     console.log(error)
 
     return NextResponse.json({
-      result: '국토부 실거래 데이터 분석 중 오류가 발생했습니다.',
+      result:
+        'AI 분석 중 오류 발생',
     })
   }
 }
