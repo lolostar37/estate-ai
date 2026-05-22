@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import jsPDF from 'jspdf'
 import {
   LineChart,
   Line,
@@ -60,16 +61,9 @@ function Gauge({
           value={value}
           text={`${value}${suffix}`}
           styles={{
-            path: {
-              stroke: color,
-            },
-            text: {
-              fill: '#ffffff',
-              fontSize: '18px',
-            },
-            trail: {
-              stroke: '#27272a',
-            },
+            path: { stroke: color },
+            text: { fill: '#ffffff', fontSize: '18px' },
+            trail: { stroke: '#27272a' },
           }}
         />
       </div>
@@ -93,13 +87,8 @@ export default function Home() {
     opinion: '-',
   })
 
-  const bubbleNumber = parseInt(
-    metrics.bubbleRate?.replace('%', '') || '0'
-  )
-
-  const scoreNumber = parseInt(
-    metrics.investmentScore?.replace('점', '') || '0'
-  )
+  const bubbleNumber = parseInt(metrics.bubbleRate?.replace('%', '') || '0')
+  const scoreNumber = parseInt(metrics.investmentScore?.replace('점', '') || '0')
 
   async function searchApartments(keyword: string) {
     setSearch(keyword)
@@ -130,10 +119,7 @@ export default function Home() {
       const response = await fetch('/api/analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          search: targetSearch,
-          district: targetDistrict,
-        }),
+        body: JSON.stringify({ search: targetSearch, district: targetDistrict }),
       })
 
       const data = await response.json()
@@ -166,13 +152,35 @@ export default function Home() {
     }, 100)
   }
 
+  function handlePdf() {
+    const doc = new jsPDF()
+
+    doc.setFontSize(22)
+    doc.text('ESTATE AI REPORT', 20, 20)
+
+    doc.setFontSize(12)
+    doc.text(`Apartment: ${search || '-'}`, 20, 40)
+    doc.text(`Average Price: ${metrics.currentPrice || '-'}`, 20, 52)
+    doc.text(`Fair Value: ${metrics.fairValue || '-'}`, 20, 64)
+    doc.text(`Bubble Rate: ${metrics.bubbleRate || '-'}`, 20, 76)
+    doc.text(`Investment Score: ${metrics.investmentScore || '-'}`, 20, 88)
+    doc.text(`AI Opinion: ${metrics.opinion || '-'}`, 20, 100)
+
+    doc.setFontSize(14)
+    doc.text('AI Analysis', 20, 120)
+
+    doc.setFontSize(10)
+    const lines = doc.splitTextToSize(result || 'No analysis result.', 170)
+    doc.text(lines, 20, 135)
+
+    doc.save(`${search || 'estate-ai'}-report.pdf`)
+  }
+
   return (
     <main className="min-h-screen bg-black text-white p-10">
       <h1 className="text-5xl font-bold mb-2">ESTATE AI</h1>
 
-      <p className="text-zinc-400 mb-10">
-        AI 기반 부동산 투자 비서
-      </p>
+      <p className="text-zinc-400 mb-10">AI 기반 부동산 투자 비서</p>
 
       <div className="flex gap-3 mb-10">
         <select
@@ -241,9 +249,7 @@ export default function Home() {
 
         <div className="bg-zinc-900 p-5 rounded">
           <p>투자 점수</p>
-          <h2 className="text-3xl text-yellow-400">
-            {metrics.investmentScore}
-          </h2>
+          <h2 className="text-3xl text-yellow-400">{metrics.investmentScore}</h2>
         </div>
 
         <div className="bg-zinc-900 p-5 rounded">
@@ -253,19 +259,8 @@ export default function Home() {
       </div>
 
       <div className="grid grid-cols-2 gap-5 mt-10">
-        <Gauge
-          title="버블 리스크"
-          value={bubbleNumber}
-          color="#ef4444"
-          suffix="%"
-        />
-
-        <Gauge
-          title="투자 점수"
-          value={scoreNumber}
-          color="#eab308"
-          suffix="점"
-        />
+        <Gauge title="버블 리스크" value={bubbleNumber} color="#ef4444" suffix="%" />
+        <Gauge title="투자 점수" value={scoreNumber} color="#eab308" suffix="점" />
       </div>
 
       <div className="bg-zinc-900 p-8 rounded mt-10">
@@ -276,22 +271,24 @@ export default function Home() {
             <XAxis dataKey="month" />
             <YAxis />
             <Tooltip />
-            <Line
-              type="monotone"
-              dataKey="price"
-              stroke="#eab308"
-              strokeWidth={3}
-            />
+            <Line type="monotone" dataKey="price" stroke="#eab308" strokeWidth={3} />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
       <div className="bg-zinc-900 p-8 rounded mt-10">
-        <h2 className="text-2xl mb-4">AI 투자 분석</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl">AI 투자 분석</h2>
 
-        <div className="whitespace-pre-wrap">
-          {result}
+          <button
+            onClick={handlePdf}
+            className="bg-yellow-500 text-black px-5 py-3 rounded font-bold"
+          >
+            PDF 리포트 다운로드
+          </button>
         </div>
+
+        <div className="whitespace-pre-wrap">{result}</div>
       </div>
     </main>
   )
