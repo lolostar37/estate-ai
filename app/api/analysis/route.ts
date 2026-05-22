@@ -4,7 +4,6 @@ import { XMLParser } from 'fast-xml-parser'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-
     const search = body.search || ''
     const district = body.district || '11710'
 
@@ -34,7 +33,6 @@ export async function POST(req: Request) {
 
       const response = await fetch(url, { cache: 'no-store' })
       const xml = await response.text()
-
       const parser = new XMLParser()
       const json = parser.parse(xml)
 
@@ -59,6 +57,7 @@ export async function POST(req: Request) {
           bubbleRate: '-',
           opinion: '-',
         },
+        chartData: [],
       })
     }
 
@@ -66,12 +65,39 @@ export async function POST(req: Request) {
       Number(String(item.dealAmount).replaceAll(',', ''))
     )
 
-    const avg = prices.reduce((a: number, b: number) => a + b, 0) / prices.length
+    const avg =
+      prices.reduce((a: number, b: number) => a + b, 0) / prices.length
+
     const currentPrice = Math.round((avg / 10000) * 10) / 10
     const fairValue = Math.round(currentPrice * 0.92 * 10) / 10
     const bubble = Math.round(((currentPrice - fairValue) / fairValue) * 100)
-
     const opinion = bubble > 10 ? '보수 접근' : '중립'
+
+    const monthlyMap: Record<string, number[]> = {}
+
+    filtered.forEach((item: any) => {
+      const label = `${item.dealYear}.${String(item.dealMonth).padStart(2, '0')}`
+      const price = Number(String(item.dealAmount).replaceAll(',', '')) / 10000
+
+      if (!monthlyMap[label]) {
+        monthlyMap[label] = []
+      }
+
+      monthlyMap[label].push(price)
+    })
+
+    const chartData = Object.keys(monthlyMap)
+      .sort()
+      .map((month) => {
+        const values = monthlyMap[month]
+        const avgPrice =
+          values.reduce((a, b) => a + b, 0) / values.length
+
+        return {
+          month,
+          price: Math.round(avgPrice * 10) / 10,
+        }
+      })
 
     const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -121,6 +147,7 @@ AI 기본 의견: ${opinion}
         bubbleRate: `${bubble}%`,
         opinion,
       },
+      chartData,
     })
   } catch (error) {
     return NextResponse.json({
@@ -131,6 +158,7 @@ AI 기본 의견: ${opinion}
         bubbleRate: '-',
         opinion: '-',
       },
+      chartData: [],
     })
   }
 }
