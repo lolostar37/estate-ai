@@ -35,6 +35,13 @@ type Suggestion = {
   opinion?: string
 }
 
+type Favorite = {
+  id: number
+  user_email: string
+  apartment_name: string
+  district: string
+}
+
 const districtMap: Record<string, string> = {
   잠실엘스: '11710',
   리센츠: '11710',
@@ -82,6 +89,7 @@ export default function Home() {
   const [district, setDistrict] = useState('11710')
   const [search, setSearch] = useState('')
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [favorites, setFavorites] = useState<Favorite[]>([])
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState('')
   const [chartData, setChartData] = useState<any[]>([])
@@ -99,12 +107,24 @@ export default function Home() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      setUserEmail(data.session?.user.email || null)
+      const email = data.session?.user.email || null
+      setUserEmail(email)
+
+      if (email) {
+        loadFavorites(email)
+      }
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setUserEmail(session?.user.email || null)
+        const email = session?.user.email || null
+        setUserEmail(email)
+
+        if (email) {
+          loadFavorites(email)
+        } else {
+          setFavorites([])
+        }
       }
     )
 
@@ -125,6 +145,50 @@ export default function Home() {
   async function logout() {
     await supabase.auth.signOut()
     setUserEmail(null)
+    setFavorites([])
+  }
+
+  async function loadFavorites(email: string) {
+    const response = await fetch(
+      `/api/favorites?user_email=${encodeURIComponent(email)}`
+    )
+
+    const data = await response.json()
+
+    if (data.success) {
+      setFavorites(data.data || [])
+    }
+  }
+
+  async function saveFavorite() {
+    if (!userEmail) {
+      alert('로그인 후 저장할 수 있습니다.')
+      return
+    }
+
+    if (!search) {
+      alert('아파트를 먼저 선택해주세요.')
+      return
+    }
+
+    const response = await fetch('/api/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_email: userEmail,
+        apartment_name: search,
+        district,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      alert('관심 아파트에 저장되었습니다.')
+      loadFavorites(userEmail)
+    } else {
+      alert(data.message || '저장 실패')
+    }
   }
 
   async function searchApartments(keyword: string) {
@@ -164,6 +228,8 @@ export default function Home() {
 
       const data = await response.json()
 
+      setSearch(targetSearch)
+      setDistrict(targetDistrict)
       setResult(data.result || '응답 없음')
       setMetrics(data.metrics || {})
       setChartData(data.chartData || [])
@@ -293,7 +359,38 @@ export default function Home() {
         >
           {loading ? '분석중...' : 'AI 분석'}
         </button>
+
+        <button
+          onClick={saveFavorite}
+          className="bg-zinc-800 px-6 rounded font-bold"
+        >
+          관심 저장
+        </button>
       </div>
+
+      {userEmail && (
+        <div className="bg-zinc-900 p-6 rounded mb-10">
+          <h2 className="text-xl font-bold mb-4">내 관심 아파트</h2>
+
+          {favorites.length === 0 ? (
+            <p className="text-zinc-400">아직 저장된 아파트가 없습니다.</p>
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              {favorites.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() =>
+                    runAnalyze(item.apartment_name, item.district)
+                  }
+                  className="bg-black border border-zinc-700 px-4 py-3 rounded hover:bg-zinc-800"
+                >
+                  {item.apartment_name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-5 gap-5">
         <div className="bg-zinc-900 p-5 rounded">
