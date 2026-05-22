@@ -410,8 +410,8 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="flex gap-3 mb-10">
-        <select
+<div className="flex flex-col md:flex-row gap-3 mb-10">
+          <select
           value={district}
           onChange={(e) => setDistrict(e.target.value)}
           className="bg-zinc-900 p-4 rounded"
@@ -467,8 +467,8 @@ export default function Home() {
       </div>
 
       {userEmail && (
-        <div className="grid grid-cols-2 gap-5 mb-10">
-          <div className="bg-zinc-900 p-6 rounded">
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-10">
+            <div className="bg-zinc-900 p-6 rounded">
             <h2 className="text-xl font-bold mb-4">내 관심 아파트</h2>
 
             {favorites.length === 0 ? (
@@ -537,8 +537,8 @@ export default function Home() {
         </div>
       )}
 
-      <div className="grid grid-cols-5 gap-5">
-        <div className="bg-zinc-900 p-5 rounded">
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+          <div className="bg-zinc-900 p-5 rounded">
           <p>실거래 평균</p>
           <h2 className="text-3xl">{metrics.currentPrice}</h2>
         </div>
@@ -566,8 +566,8 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-5 mt-10">
-        <Gauge
+<div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-10">
+          <Gauge
           title="버블 리스크"
           value={bubbleNumber}
           color="#ef4444"
