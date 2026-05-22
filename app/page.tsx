@@ -34,6 +34,8 @@ type Suggestion = {
   fair_value?: number
   bubble_rate?: number
   opinion?: string
+  district_name?: string
+  district_code?: string
 }
 
 type Favorite = {
@@ -304,17 +306,17 @@ export default function Home() {
     runAnalyze(search, district)
   }
 
-  function selectSuggestion(item: Suggestion) {
-    const code = districtMap[item.name] || district
-    setSearch(item.name)
-    setDistrict(code)
-    setSuggestions([])
+function selectSuggestion(item: Suggestion) {
+  const code = item.district_code || districtMap[item.name] || district
 
-    setTimeout(() => {
-      runAnalyze(item.name, code)
-    }, 100)
-  }
+  setSearch(item.name)
+  setDistrict(code)
+  setSuggestions([])
 
+  setTimeout(() => {
+    runAnalyze(item.name, code)
+  }, 100)
+}
   function openHistory(item: History) {
     setSearch(item.apartment_name)
     setDistrict(item.district)
@@ -435,8 +437,7 @@ export default function Home() {
                 >
                   <div className="font-bold">{item.name}</div>
                   <div className="text-sm text-zinc-400">
-                    기준가 {item.current_price}억 · 의견 {item.opinion}
-                  </div>
+{item.district_name || '서울'} · 기준가 {item.current_price}억 · 의견 {item.opinion}                  </div>
                 </button>
               ))}
             </div>
