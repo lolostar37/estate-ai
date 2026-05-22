@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
 import jsPDF from 'jspdf'
 import {
   LineChart,
@@ -12,6 +13,11 @@ import {
 } from 'recharts'
 import { CircularProgressbar } from 'react-circular-progressbar'
 import 'react-circular-progressbar/dist/styles.css'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 type Metrics = {
   currentPrice?: string
@@ -72,6 +78,7 @@ function Gauge({
 }
 
 export default function Home() {
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const [district, setDistrict] = useState('11710')
   const [search, setSearch] = useState('')
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
@@ -89,6 +96,36 @@ export default function Home() {
 
   const bubbleNumber = parseInt(metrics.bubbleRate?.replace('%', '') || '0')
   const scoreNumber = parseInt(metrics.investmentScore?.replace('점', '') || '0')
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUserEmail(data.session?.user.email || null)
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUserEmail(session?.user.email || null)
+      }
+    )
+
+    return () => {
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  async function loginWithGoogle() {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    })
+  }
+
+  async function logout() {
+    await supabase.auth.signOut()
+    setUserEmail(null)
+  }
 
   async function searchApartments(keyword: string) {
     setSearch(keyword)
@@ -119,7 +156,10 @@ export default function Home() {
       const response = await fetch('/api/analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ search: targetSearch, district: targetDistrict }),
+        body: JSON.stringify({
+          search: targetSearch,
+          district: targetDistrict,
+        }),
       })
 
       const data = await response.json()
@@ -178,9 +218,33 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-white p-10">
-      <h1 className="text-5xl font-bold mb-2">ESTATE AI</h1>
+      <div className="flex justify-between items-start mb-10">
+        <div>
+          <h1 className="text-5xl font-bold mb-2">ESTATE AI</h1>
+          <p className="text-zinc-400">AI 기반 부동산 투자 비서</p>
+        </div>
 
-      <p className="text-zinc-400 mb-10">AI 기반 부동산 투자 비서</p>
+        <div>
+          {userEmail ? (
+            <div className="text-right">
+              <p className="text-sm text-zinc-400 mb-2">{userEmail}</p>
+              <button
+                onClick={logout}
+                className="bg-zinc-800 px-5 py-3 rounded font-bold"
+              >
+                로그아웃
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={loginWithGoogle}
+              className="bg-white text-black px-6 py-3 rounded font-bold"
+            >
+              Google로 로그인
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="flex gap-3 mb-10">
         <select
@@ -249,7 +313,9 @@ export default function Home() {
 
         <div className="bg-zinc-900 p-5 rounded">
           <p>투자 점수</p>
-          <h2 className="text-3xl text-yellow-400">{metrics.investmentScore}</h2>
+          <h2 className="text-3xl text-yellow-400">
+            {metrics.investmentScore}
+          </h2>
         </div>
 
         <div className="bg-zinc-900 p-5 rounded">
