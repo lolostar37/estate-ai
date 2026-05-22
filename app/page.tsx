@@ -17,16 +17,13 @@ type Metrics = {
   opinion?: string
 }
 
-const apartmentSuggestions = [
-  '잠실엘스',
-  '리센츠',
-  '헬리오시티',
-  '래미안대치팰리스',
-  '아크로리버파크',
-  '반포자이',
-  '마포래미안푸르지오',
-  '트리마제',
-]
+type Suggestion = {
+  name: string
+  current_price?: number
+  fair_value?: number
+  bubble_rate?: number
+  opinion?: string
+}
 
 export default function Home() {
   const [district, setDistrict] = useState('11710')
@@ -34,6 +31,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState('')
   const [chartData, setChartData] = useState<any[]>([])
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
 
   const [metrics, setMetrics] = useState<Metrics>({
     currentPrice: '-',
@@ -42,10 +40,26 @@ export default function Home() {
     opinion: '-',
   })
 
-  const filteredSuggestions =
-    search.length > 0
-      ? apartmentSuggestions.filter((name) => name.includes(search))
-      : []
+  async function searchApartments(keyword: string) {
+    setSearch(keyword)
+
+    if (keyword.length < 1) {
+      setSuggestions([])
+      return
+    }
+
+    const response = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword }),
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      setSuggestions(data.data || [])
+    }
+  }
 
   async function handleAnalyze() {
     try {
@@ -54,13 +68,8 @@ export default function Home() {
 
       const response = await fetch('/api/analysis', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          search,
-          district,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ search, district }),
       })
 
       const data = await response.json()
@@ -68,6 +77,7 @@ export default function Home() {
       setResult(data.result || '응답 없음')
       setMetrics(data.metrics || {})
       setChartData(data.chartData || [])
+      setSuggestions([])
     } catch (error) {
       console.error(error)
       setResult('오류 발생')
@@ -101,20 +111,26 @@ export default function Home() {
         <div className="relative flex-1">
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => searchApartments(e.target.value)}
             placeholder="예: 잠실엘스"
             className="w-full p-4 rounded bg-zinc-900"
           />
 
-          {filteredSuggestions.length > 0 && (
-            <div className="absolute z-10 mt-2 w-full bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden">
-              {filteredSuggestions.map((name) => (
+          {suggestions.length > 0 && (
+            <div className="absolute z-20 mt-2 w-full bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden">
+              {suggestions.map((item) => (
                 <button
-                  key={name}
-                  onClick={() => setSearch(name)}
+                  key={item.name}
+                  onClick={() => {
+                    setSearch(item.name)
+                    setSuggestions([])
+                  }}
                   className="block w-full text-left px-4 py-3 hover:bg-zinc-800"
                 >
-                  {name}
+                  <div className="font-bold">{item.name}</div>
+                  <div className="text-sm text-zinc-400">
+                    기준가 {item.current_price}억 · 의견 {item.opinion}
+                  </div>
                 </button>
               ))}
             </div>
