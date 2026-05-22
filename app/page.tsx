@@ -359,7 +359,7 @@ export default function Home() {
     const doc = new jsPDF()
 
     doc.setFontSize(22)
-    doc.text('ESTATE AI REPORT', 20, 20)
+    doc.text('Move Up AI REPORT', 20, 20)
 
     doc.setFontSize(12)
     doc.text(`Apartment: ${search || '-'}`, 20, 40)
