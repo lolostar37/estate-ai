@@ -10,6 +10,7 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  CartesianGrid,
 } from 'recharts'
 import { CircularProgressbar } from 'react-circular-progressbar'
 import 'react-circular-progressbar/dist/styles.css'
@@ -37,7 +38,6 @@ type Suggestion = {
 
 type Favorite = {
   id: number
-  user_email: string
   apartment_name: string
   district: string
 }
@@ -52,7 +52,14 @@ type History = {
   investment_score: string
   opinion: string
   result: string
-  created_at: string
+}
+
+type Forecast = {
+  after5YearsBear: number
+  after5YearsBase: number
+  after5YearsBull: number
+  expectedGrowthRate: number
+  annualGrowthRate: number
 }
 
 const districtMap: Record<string, string> = {
@@ -81,7 +88,6 @@ function Gauge({
   return (
     <div className="bg-zinc-900 p-8 rounded">
       <h2 className="text-xl mb-6">{title}</h2>
-
       <div className="w-48 h-48 mx-auto">
         <CircularProgressbar
           value={value}
@@ -107,6 +113,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState('')
   const [chartData, setChartData] = useState<any[]>([])
+  const [forecastData, setForecastData] = useState<any[]>([])
+  const [forecast, setForecast] = useState<Forecast | null>(null)
 
   const [metrics, setMetrics] = useState<Metrics>({
     currentPrice: '-',
@@ -153,9 +161,7 @@ export default function Home() {
   async function loginWithGoogle() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-      },
+      options: { redirectTo: window.location.origin },
     })
   }
 
@@ -167,51 +173,28 @@ export default function Home() {
   }
 
   async function loadFavorites(email: string) {
-    const response = await fetch(
-      `/api/favorites?user_email=${encodeURIComponent(email)}`
-    )
-
-    const data = await response.json()
-
-    if (data.success) {
-      setFavorites(data.data || [])
-    }
+    const res = await fetch(`/api/favorites?user_email=${encodeURIComponent(email)}`)
+    const data = await res.json()
+    if (data.success) setFavorites(data.data || [])
   }
 
   async function loadHistory(email: string) {
-    const response = await fetch(
-      `/api/history?user_email=${encodeURIComponent(email)}`
-    )
-
-    const data = await response.json()
-
-    if (data.success) {
-      setHistory(data.data || [])
-    }
+    const res = await fetch(`/api/history?user_email=${encodeURIComponent(email)}`)
+    const data = await res.json()
+    if (data.success) setHistory(data.data || [])
   }
 
   async function saveFavorite() {
-    if (!userEmail) {
-      alert('로그인 후 저장할 수 있습니다.')
-      return
-    }
+    if (!userEmail) return alert('로그인 후 저장할 수 있습니다.')
+    if (!search) return alert('아파트를 먼저 선택해주세요.')
 
-    if (!search) {
-      alert('아파트를 먼저 선택해주세요.')
-      return
-    }
-
-    const response = await fetch('/api/favorites', {
+    const res = await fetch('/api/favorites', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_email: userEmail,
-        apartment_name: search,
-        district,
-      }),
+      body: JSON.stringify({ user_email: userEmail, apartment_name: search, district }),
     })
 
-    const data = await response.json()
+    const data = await res.json()
 
     if (data.success) {
       alert('관심 아파트에 저장되었습니다.')
@@ -228,9 +211,7 @@ export default function Home() {
       body: JSON.stringify({ id }),
     })
 
-    if (userEmail) {
-      loadFavorites(userEmail)
-    }
+    if (userEmail) loadFavorites(userEmail)
   }
 
   async function deleteHistory(id: number) {
@@ -240,9 +221,7 @@ export default function Home() {
       body: JSON.stringify({ id }),
     })
 
-    if (userEmail) {
-      loadHistory(userEmail)
-    }
+    if (userEmail) loadHistory(userEmail)
   }
 
   async function saveHistory(
@@ -278,40 +257,36 @@ export default function Home() {
       return
     }
 
-    const response = await fetch('/api/search', {
+    const res = await fetch('/api/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keyword }),
     })
 
-    const data = await response.json()
-
-    if (data.success) {
-      setSuggestions(data.data || [])
-    }
+    const data = await res.json()
+    if (data.success) setSuggestions(data.data || [])
   }
 
   async function runAnalyze(targetSearch: string, targetDistrict: string) {
     try {
       setLoading(true)
-      setResult('분석중...')
+      setResult('분석중... 10년 데이터를 조회하고 있어 시간이 조금 걸릴 수 있습니다.')
 
-      const response = await fetch('/api/analysis', {
+      const res = await fetch('/api/analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          search: targetSearch,
-          district: targetDistrict,
-        }),
+        body: JSON.stringify({ search: targetSearch, district: targetDistrict }),
       })
 
-      const data = await response.json()
+      const data = await res.json()
 
       setSearch(targetSearch)
       setDistrict(targetDistrict)
       setResult(data.result || '응답 없음')
       setMetrics(data.metrics || {})
       setChartData(data.chartData || [])
+      setForecastData(data.forecastData || [])
+      setForecast(data.forecast || null)
       setSuggestions([])
 
       if (userEmail && data.metrics) {
@@ -331,7 +306,6 @@ export default function Home() {
 
   function selectSuggestion(item: Suggestion) {
     const code = districtMap[item.name] || district
-
     setSearch(item.name)
     setDistrict(code)
     setSuggestions([])
@@ -359,7 +333,7 @@ export default function Home() {
     const doc = new jsPDF()
 
     doc.setFontSize(22)
-    doc.text('Move Up AI REPORT', 20, 20)
+    doc.text('MOVEUP_AI REPORT', 20, 20)
 
     doc.setFontSize(12)
     doc.text(`Apartment: ${search || '-'}`, 20, 40)
@@ -369,14 +343,21 @@ export default function Home() {
     doc.text(`Investment Score: ${metrics.investmentScore || '-'}`, 20, 88)
     doc.text(`AI Opinion: ${metrics.opinion || '-'}`, 20, 100)
 
+    if (forecast) {
+      doc.text(`5Y Bear: ${forecast.after5YearsBear}억`, 20, 112)
+      doc.text(`5Y Base: ${forecast.after5YearsBase}억`, 20, 124)
+      doc.text(`5Y Bull: ${forecast.after5YearsBull}억`, 20, 136)
+      doc.text(`Expected Growth: ${forecast.expectedGrowthRate}%`, 20, 148)
+    }
+
     doc.setFontSize(14)
-    doc.text('AI Analysis', 20, 120)
+    doc.text('AI Analysis', 20, 165)
 
     doc.setFontSize(10)
     const lines = doc.splitTextToSize(result || 'No analysis result.', 170)
-    doc.text(lines, 20, 135)
+    doc.text(lines, 20, 180)
 
-    doc.save(`${search || 'estate-ai'}-report.pdf`)
+    doc.save(`${search || 'moveup-ai'}-report.pdf`)
   }
 
   return (
@@ -390,12 +371,12 @@ export default function Home() {
           <h1 className="text-5xl md:text-7xl font-bold mb-5 leading-tight">
             부동산 가격 거품을
             <br />
-            AI가 분석합니다
+            MOVEUP_AI가 분석합니다
           </h1>
 
           <p className="text-zinc-400 text-lg md:text-xl max-w-3xl leading-8">
             국토부 실거래 데이터를 기반으로 아파트의 평균 거래가, 적정가,
-            버블률, 투자 점수를 분석하고 나만의 관심 아파트와 분석 기록을 저장합니다.
+            버블률, 투자 점수와 향후 5년 가격 전망을 분석합니다.
           </p>
         </div>
 
@@ -493,9 +474,7 @@ export default function Home() {
                     className="bg-black border border-zinc-700 px-4 py-3 rounded flex gap-3 items-center"
                   >
                     <button
-                      onClick={() =>
-                        runAnalyze(item.apartment_name, item.district)
-                      }
+                      onClick={() => runAnalyze(item.apartment_name, item.district)}
                     >
                       {item.apartment_name}
                     </button>
@@ -530,8 +509,7 @@ export default function Home() {
                     >
                       <div className="font-bold">{item.apartment_name}</div>
                       <div className="text-sm text-zinc-400">
-                        {item.current_price} · {item.investment_score} ·{' '}
-                        {item.opinion}
+                        {item.current_price} · {item.investment_score} · {item.opinion}
                       </div>
                     </button>
 
@@ -578,6 +556,32 @@ export default function Home() {
         </div>
       </div>
 
+      {forecast && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mt-10">
+          <div className="bg-zinc-900 p-5 rounded">
+            <p>5년 뒤 보수 전망</p>
+            <h2 className="text-3xl">{forecast.after5YearsBear}억</h2>
+          </div>
+
+          <div className="bg-zinc-900 p-5 rounded">
+            <p>5년 뒤 중립 전망</p>
+            <h2 className="text-3xl text-yellow-400">
+              {forecast.after5YearsBase}억
+            </h2>
+          </div>
+
+          <div className="bg-zinc-900 p-5 rounded">
+            <p>5년 뒤 낙관 전망</p>
+            <h2 className="text-3xl">{forecast.after5YearsBull}억</h2>
+          </div>
+
+          <div className="bg-zinc-900 p-5 rounded">
+            <p>5년 예상 상승률</p>
+            <h2 className="text-3xl">{forecast.expectedGrowthRate}%</h2>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-10">
         <Gauge
           title="버블 리스크"
@@ -595,11 +599,12 @@ export default function Home() {
       </div>
 
       <div className="bg-zinc-900 p-8 rounded mt-10">
-        <h2 className="text-2xl mb-5">최근 12개월 가격 추이</h2>
+        <h2 className="text-2xl mb-5">과거 10년 가격 흐름</h2>
 
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
-            <XAxis dataKey="month" />
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="year" />
             <YAxis />
             <Tooltip />
             <Line
@@ -610,6 +615,41 @@ export default function Home() {
             />
           </LineChart>
         </ResponsiveContainer>
+      </div>
+
+      <div className="bg-zinc-900 p-8 rounded mt-10">
+        <h2 className="text-2xl mb-5">향후 5년 가격 전망</h2>
+
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={forecastData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="year" />
+            <YAxis />
+            <Tooltip />
+            <Line
+              type="monotone"
+              dataKey="conservative"
+              stroke="#94a3b8"
+              strokeWidth={2}
+            />
+            <Line
+              type="monotone"
+              dataKey="base"
+              stroke="#eab308"
+              strokeWidth={3}
+            />
+            <Line
+              type="monotone"
+              dataKey="optimistic"
+              stroke="#22c55e"
+              strokeWidth={2}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+
+        <p className="text-zinc-400 mt-4 text-sm">
+          회색: 보수 전망 / 노랑: 중립 전망 / 초록: 낙관 전망
+        </p>
       </div>
 
       <div className="bg-zinc-900 p-8 rounded mt-10">
