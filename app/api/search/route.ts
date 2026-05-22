@@ -1,63 +1,47 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 export async function POST(req: Request) {
   try {
+    const body = await req.json()
+    const keyword = body.keyword || ''
 
-    const body =
-      await req.json()
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    const keyword =
-      body.keyword || ''
+    if (!url || !key) {
+      return NextResponse.json({
+        success: false,
+        error: 'Supabase 환경변수가 없습니다.',
+        data: [],
+      })
+    }
 
-    const { data, error } =
-      await supabase
+    const supabase = createClient(url, key)
+
+    const { data, error } = await supabase
       .from('apartments')
-      .select(`
-        name,
-        current_price,
-        fair_value,
-        bubble_rate,
-        opinion
-      `)
-      .ilike(
-        'name',
-        `%${keyword}%`
-      )
+      .select('name,current_price,fair_value,bubble_rate,opinion')
+      .ilike('name', `%${keyword}%`)
       .limit(10)
 
-    if(error){
-
+    if (error) {
       return NextResponse.json({
-        success:false,
-        data:[]
+        success: false,
+        error: error.message,
+        data: [],
       })
-
     }
 
     return NextResponse.json({
-
-      success:true,
-      data
-
+      success: true,
+      data: data || [],
     })
-
-  }
-
-  catch(error){
-
+  } catch (error) {
     return NextResponse.json({
-
-      success:false,
-      data:[]
-
+      success: false,
+      error: String(error),
+      data: [],
     })
-
   }
-
 }
