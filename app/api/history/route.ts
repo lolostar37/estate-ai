@@ -43,32 +43,77 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const user_email = searchParams.get('user_email')
+  try {
+    const { searchParams } = new URL(req.url)
+    const user_email = searchParams.get('user_email')
 
-  if (!user_email) {
+    if (!user_email) {
+      return NextResponse.json({
+        success: false,
+        data: [],
+      })
+    }
+
+    const { data, error } = await supabase
+      .from('analysis_history')
+      .select('*')
+      .eq('user_email', user_email)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    if (error) {
+      return NextResponse.json({
+        success: false,
+        data: [],
+      })
+    }
+
+    return NextResponse.json({
+      success: true,
+      data,
+    })
+  } catch (error) {
     return NextResponse.json({
       success: false,
       data: [],
+      message: String(error),
     })
   }
+}
 
-  const { data, error } = await supabase
-    .from('analysis_history')
-    .select('*')
-    .eq('user_email', user_email)
-    .order('created_at', { ascending: false })
-    .limit(20)
+export async function DELETE(req: Request) {
+  try {
+    const body = await req.json()
 
-  if (error) {
+    const { id } = body
+
+    if (!id) {
+      return NextResponse.json({
+        success: false,
+        message: '삭제할 ID가 없습니다.',
+      })
+    }
+
+    const { error } = await supabase
+      .from('analysis_history')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      return NextResponse.json({
+        success: false,
+        message: error.message,
+      })
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: '삭제되었습니다.',
+    })
+  } catch (error) {
     return NextResponse.json({
       success: false,
-      data: [],
+      message: String(error),
     })
   }
-
-  return NextResponse.json({
-    success: true,
-    data,
-  })
 }
