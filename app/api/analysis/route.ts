@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     const key = process.env.MOLIT_API_KEY
     const openaiKey = process.env.OPENAI_API_KEY
 
-    const lawdCode = '11710' // 송파구
+    const lawdCode=body.district // 송파구
     const dealYmd = '202604'
 
     const url =
