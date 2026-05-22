@@ -12,17 +12,23 @@ export async function POST(req: Request) {
 
     const { error } = await supabase
       .from('analysis_history')
-      .insert({
-        user_email: body.user_email,
-        apartment_name: body.apartment_name,
-        district: body.district,
-        current_price: body.current_price,
-        fair_value: body.fair_value,
-        bubble_rate: body.bubble_rate,
-        investment_score: body.investment_score,
-        opinion: body.opinion,
-        result: body.result,
-      })
+      .upsert(
+        {
+          user_email: body.user_email,
+          apartment_name: body.apartment_name,
+          district: body.district,
+          current_price: body.current_price,
+          fair_value: body.fair_value,
+          bubble_rate: body.bubble_rate,
+          investment_score: body.investment_score,
+          opinion: body.opinion,
+          result: body.result,
+          created_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'user_email,apartment_name',
+        }
+      )
 
     if (error) {
       return NextResponse.json({
@@ -84,7 +90,6 @@ export async function GET(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const body = await req.json()
-
     const { id } = body
 
     if (!id) {
