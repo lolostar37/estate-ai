@@ -14,19 +14,22 @@ export default function AdminPage() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState('')
 
   useEffect(() => {
     checkUser()
   }, [])
 
   async function checkUser() {
-    const { data } = await supabase.auth.getSession()
-    const email = data.session?.user.email || null
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
 
+    const email = session?.user.email || null
     setUserEmail(email)
 
     if (email === ADMIN_EMAIL) {
-      loadAdminData()
+      await loadAdminData()
     }
 
     setLoading(false)
@@ -48,8 +51,30 @@ export default function AdminPage() {
   }
 
   async function loadAdminData() {
-    const response = await fetch('/api/admin')
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const token = session?.access_token
+
+    if (!token) {
+      setMessage('로그인이 필요합니다.')
+      return
+    }
+
+    const response = await fetch('/api/admin', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
     const result = await response.json()
+
+    if (!result.success) {
+      setMessage(result.message || '관리자 데이터를 불러올 수 없습니다.')
+      return
+    }
+
     setData(result)
   }
 
@@ -98,7 +123,7 @@ export default function AdminPage() {
   if (!data) {
     return (
       <main className="min-h-screen bg-black text-white p-10">
-        관리자 데이터 불러오는 중...
+        <p>{message || '관리자 데이터 불러오는 중...'}</p>
       </main>
     )
   }
@@ -153,10 +178,7 @@ export default function AdminPage() {
               key={item.name}
               className="flex justify-between border-b border-zinc-800 py-3"
             >
-              <span>
-                {index + 1}. {item.name}
-              </span>
-
+              <span>{index + 1}. {item.name}</span>
               <span>{item.count}회</span>
             </div>
           ))
@@ -177,7 +199,6 @@ export default function AdminPage() {
               className="border-b border-zinc-800 py-3"
             >
               <p className="font-bold">{item.apartment_name}</p>
-
               <p className="text-sm text-zinc-400">
                 {item.user_email} · {item.current_price} · {item.investment_score}
               </p>

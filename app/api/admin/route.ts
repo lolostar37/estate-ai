@@ -6,7 +6,32 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export async function GET() {
+export async function GET(req: Request) {
+  const adminEmail = process.env.ADMIN_EMAIL
+
+  const authHeader = req.headers.get('authorization')
+
+  if (!authHeader) {
+    return NextResponse.json(
+      { success: false, message: '권한이 없습니다.' },
+      { status: 401 }
+    )
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser(token)
+
+  if (userError || !user || user.email !== adminEmail) {
+    return NextResponse.json(
+      { success: false, message: '관리자만 접근할 수 있습니다.' },
+      { status: 403 }
+    )
+  }
+
   const { data: favorites } = await supabase
     .from('favorites')
     .select('*')
