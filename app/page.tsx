@@ -14,6 +14,7 @@ type Metrics = {
   currentPrice?: string
   fairValue?: string
   bubbleRate?: string
+  investmentScore?: string
   opinion?: string
 }
 
@@ -49,6 +50,7 @@ export default function Home() {
     currentPrice: '-',
     fairValue: '-',
     bubbleRate: '-',
+    investmentScore: '-',
     opinion: '-',
   })
 
@@ -157,7 +159,7 @@ export default function Home() {
                 >
                   <div className="font-bold">{item.name}</div>
                   <div className="text-sm text-zinc-400">
-                    실거래 {item.current_price}억 · 의견 {item.opinion}
+                    기준가 {item.current_price}억 · 의견 {item.opinion}
                   </div>
                 </button>
               ))}
@@ -174,7 +176,7 @@ export default function Home() {
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-5">
+      <div className="grid grid-cols-5 gap-5">
         <div className="bg-zinc-900 p-5 rounded">
           <p>실거래 평균</p>
           <h2 className="text-3xl">{metrics.currentPrice}</h2>
@@ -188,6 +190,13 @@ export default function Home() {
         <div className="bg-zinc-900 p-5 rounded">
           <p>버블률</p>
           <h2 className="text-3xl">{metrics.bubbleRate}</h2>
+        </div>
+
+        <div className="bg-zinc-900 p-5 rounded">
+          <p>투자 점수</p>
+          <h2 className="text-3xl text-yellow-400">
+            {metrics.investmentScore}
+          </h2>
         </div>
 
         <div className="bg-zinc-900 p-5 rounded">

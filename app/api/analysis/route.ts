@@ -4,6 +4,7 @@ import { XMLParser } from 'fast-xml-parser'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
+
     const search = body.search || ''
     const district = body.district || '11710'
 
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
 
       const response = await fetch(url, { cache: 'no-store' })
       const xml = await response.text()
+
       const parser = new XMLParser()
       const json = parser.parse(xml)
 
@@ -55,6 +57,7 @@ export async function POST(req: Request) {
           currentPrice: '-',
           fairValue: '-',
           bubbleRate: '-',
+          investmentScore: '-',
           opinion: '-',
         },
         chartData: [],
@@ -71,27 +74,31 @@ export async function POST(req: Request) {
     const currentPrice = Math.round((avg / 10000) * 10) / 10
     const fairValue = Math.round(currentPrice * 0.92 * 10) / 10
     const bubble = Math.round(((currentPrice - fairValue) / fairValue) * 100)
-    const opinion = bubble > 10 ? '보수 접근' : '중립'
+
+    const investmentScore = Math.max(0, Math.min(100, 100 - bubble * 3))
+
+    const opinion =
+      investmentScore >= 80
+        ? '관심 권장'
+        : investmentScore >= 60
+        ? '중립'
+        : '보수 접근'
 
     const monthlyMap: Record<string, number[]> = {}
 
     filtered.forEach((item: any) => {
-      const label = `${item.dealYear}.${String(item.dealMonth).padStart(2, '0')}`
+      const month = `${item.dealYear}.${String(item.dealMonth).padStart(2, '0')}`
       const price = Number(String(item.dealAmount).replaceAll(',', '')) / 10000
 
-      if (!monthlyMap[label]) {
-        monthlyMap[label] = []
-      }
-
-      monthlyMap[label].push(price)
+      if (!monthlyMap[month]) monthlyMap[month] = []
+      monthlyMap[month].push(price)
     })
 
     const chartData = Object.keys(monthlyMap)
       .sort()
       .map((month) => {
         const values = monthlyMap[month]
-        const avgPrice =
-          values.reduce((a, b) => a + b, 0) / values.length
+        const avgPrice = values.reduce((a, b) => a + b, 0) / values.length
 
         return {
           month,
@@ -111,7 +118,7 @@ export async function POST(req: Request) {
           {
             role: 'system',
             content:
-              '너는 대한민국 부동산 투자 분석가다. 제공된 실거래 데이터를 기준으로만 분석한다.',
+              '너는 대한민국 부동산 투자 분석가다. 제공된 실거래 데이터만 기준으로 분석한다.',
           },
           {
             role: 'user',
@@ -121,6 +128,7 @@ export async function POST(req: Request) {
 평균 실거래가: ${currentPrice}억
 AI 적정가 추정: ${fairValue}억
 버블률 추정: ${bubble}%
+AI 투자 점수: ${investmentScore}점
 AI 기본 의견: ${opinion}
 
 아래 형식으로 분석해줘.
@@ -145,6 +153,7 @@ AI 기본 의견: ${opinion}
         currentPrice: `${currentPrice}억`,
         fairValue: `${fairValue}억`,
         bubbleRate: `${bubble}%`,
+        investmentScore: `${investmentScore}점`,
         opinion,
       },
       chartData,
@@ -156,6 +165,7 @@ AI 기본 의견: ${opinion}
         currentPrice: '-',
         fairValue: '-',
         bubbleRate: '-',
+        investmentScore: '-',
         opinion: '-',
       },
       chartData: [],
