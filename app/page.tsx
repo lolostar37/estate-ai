@@ -380,16 +380,28 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-black text-white p-10">
-      <div className="flex justify-between items-start mb-10">
+    <main className="min-h-screen bg-black text-white p-6 md:p-10">
+      <div className="flex flex-col md:flex-row justify-between items-start gap-6 mb-14">
         <div>
-          <h1 className="text-5xl font-bold mb-2">ESTATE AI</h1>
-          <p className="text-zinc-400">AI 기반 부동산 투자 비서</p>
+          <p className="text-yellow-500 mb-3 tracking-[0.3em] text-sm">
+            AI REAL ESTATE INTELLIGENCE
+          </p>
+
+          <h1 className="text-5xl md:text-7xl font-bold mb-5 leading-tight">
+            부동산 가격 거품을
+            <br />
+            AI가 분석합니다
+          </h1>
+
+          <p className="text-zinc-400 text-lg md:text-xl max-w-3xl leading-8">
+            국토부 실거래 데이터를 기반으로 아파트의 평균 거래가, 적정가,
+            버블률, 투자 점수를 분석하고 나만의 관심 아파트와 분석 기록을 저장합니다.
+          </p>
         </div>
 
         <div>
           {userEmail ? (
-            <div className="text-right">
+            <div className="text-left md:text-right">
               <p className="text-sm text-zinc-400 mb-2">{userEmail}</p>
 
               <button
@@ -410,8 +422,8 @@ export default function Home() {
         </div>
       </div>
 
-<div className="flex flex-col md:flex-row gap-3 mb-10">
-          <select
+      <div className="flex flex-col md:flex-row gap-3 mb-10">
+        <select
           value={district}
           onChange={(e) => setDistrict(e.target.value)}
           className="bg-zinc-900 p-4 rounded"
@@ -453,22 +465,22 @@ export default function Home() {
         <button
           onClick={handleAnalyze}
           disabled={loading}
-          className="bg-yellow-500 px-8 rounded text-black font-bold disabled:opacity-50"
+          className="bg-yellow-500 px-8 py-4 rounded text-black font-bold disabled:opacity-50"
         >
           {loading ? '분석중...' : 'AI 분석'}
         </button>
 
         <button
           onClick={saveFavorite}
-          className="bg-zinc-800 px-6 rounded font-bold"
+          className="bg-zinc-800 px-6 py-4 rounded font-bold"
         >
           관심 저장
         </button>
       </div>
 
       {userEmail && (
-<div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-10">
-            <div className="bg-zinc-900 p-6 rounded">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-10">
+          <div className="bg-zinc-900 p-6 rounded">
             <h2 className="text-xl font-bold mb-4">내 관심 아파트</h2>
 
             {favorites.length === 0 ? (
@@ -537,8 +549,8 @@ export default function Home() {
         </div>
       )}
 
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
-          <div className="bg-zinc-900 p-5 rounded">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+        <div className="bg-zinc-900 p-5 rounded">
           <p>실거래 평균</p>
           <h2 className="text-3xl">{metrics.currentPrice}</h2>
         </div>
@@ -566,8 +578,8 @@ export default function Home() {
         </div>
       </div>
 
-<div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-10">
-          <Gauge
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-10">
+        <Gauge
           title="버블 리스크"
           value={bubbleNumber}
           color="#ef4444"
@@ -601,7 +613,7 @@ export default function Home() {
       </div>
 
       <div className="bg-zinc-900 p-8 rounded mt-10">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <h2 className="text-2xl">AI 투자 분석</h2>
 
           <button
