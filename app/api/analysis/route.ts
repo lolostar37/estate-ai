@@ -1,5 +1,11 @@
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { XMLParser } from 'fast-xml-parser'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function POST(req: Request) {
   try {
@@ -7,7 +13,7 @@ export async function POST(req: Request) {
 
     const search = body.search || ''
     const district = body.district || '11710'
-
+ㅁ
     const key = process.env.MOLIT_API_KEY
     const openaiKey = process.env.OPENAI_API_KEY
 
@@ -196,8 +202,21 @@ AI 적정가 추정: ${fairValue}억
     )
 
     const gpt = await gptResponse.json()
-
-    return NextResponse.json({
+await supabase
+  .from('apartments')
+  .upsert(
+    {
+      name: search,
+      district_code: district,
+      current_price: currentPrice,
+      fair_value: fairValue,
+      bubble_rate: bubble,
+      opinion,
+    },
+    {
+      onConflict: 'name'
+    }
+  )      return NextResponse.json({
       result: gpt.choices?.[0]?.message?.content || `${search} 분석 완료`,
       metrics: {
         currentPrice: `${currentPrice}억`,
