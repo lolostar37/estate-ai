@@ -18,6 +18,27 @@ export async function POST(req: Request) {
       })
     }
 
+    const { data: existing, error: checkError } = await supabase
+      .from('favorites')
+      .select('id')
+      .eq('user_email', user_email)
+      .eq('apartment_name', apartment_name)
+      .limit(1)
+
+    if (checkError) {
+      return NextResponse.json({
+        success: false,
+        message: checkError.message,
+      })
+    }
+
+    if (existing && existing.length > 0) {
+      return NextResponse.json({
+        success: false,
+        message: '이미 저장된 아파트입니다.',
+      })
+    }
+
     const { error } = await supabase.from('favorites').insert({
       user_email,
       apartment_name,
