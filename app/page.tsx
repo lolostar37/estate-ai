@@ -371,9 +371,9 @@ function selectSuggestion(item: Suggestion) {
           </p>
 
           <h1 className="text-5xl md:text-7xl font-bold mb-5 leading-tight">
-            부동산 가격 거품을
+            MOVEUP_AI
             <br />
-            MOVEUP_AI가 분석합니다
+            부동산 가격 거품 분석기
           </h1>
 
           <p className="text-zinc-400 text-lg md:text-xl max-w-3xl leading-8">
