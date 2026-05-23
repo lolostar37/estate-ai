@@ -117,6 +117,8 @@ export default function Home() {
   const [chartData, setChartData] = useState<any[]>([])
   const [forecastData, setForecastData] = useState<any[]>([])
   const [forecast, setForecast] = useState<Forecast | null>(null)
+const [alerts, setAlerts] = useState<any[]>([])
+const [targetPrice, setTargetPrice] = useState('')
 
   const [metrics, setMetrics] = useState<Metrics>({
     currentPrice: '-',
@@ -135,9 +137,11 @@ export default function Home() {
       setUserEmail(email)
 
       if (email) {
-        loadFavorites(email)
-        loadHistory(email)
-      }
+loadFavorites(email)
+
+loadHistory(email)
+
+loadAlerts(email)      }
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange(
@@ -146,8 +150,12 @@ export default function Home() {
         setUserEmail(email)
 
         if (email) {
-          loadFavorites(email)
-          loadHistory(email)
+loadFavorites(email)
+
+loadHistory(email)
+
+loadAlerts(email)
+loadHistory(email)
         } else {
           setFavorites([])
           setHistory([])
@@ -225,6 +233,62 @@ export default function Home() {
 
     if (userEmail) loadHistory(userEmail)
   }
+async function loadAlerts(email: string) {
+  const response = await fetch(
+    `/api/alerts?user_email=${encodeURIComponent(email)}`
+  )
+
+  const data = await response.json()
+
+  if (data.success) {
+    setAlerts(data.data || [])
+  }
+}
+
+async function createAlert() {
+  if (!userEmail) {
+    return alert('로그인 필요')
+  }
+
+  if (!search || !targetPrice) {
+    return alert('아파트와 목표가격 입력')
+  }
+
+  const response = await fetch('/api/alerts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      user_email: userEmail,
+      apartment_name: search,
+      target_price: Number(targetPrice),
+      alert_type: 'below',
+    }),
+  })
+
+  const data = await response.json()
+
+  if (data.success) {
+    alert('알림 저장 완료')
+    loadAlerts(userEmail)
+    setTargetPrice('')
+  }
+}
+
+async function deleteAlert(id:number){
+  await fetch('/api/alerts',{
+    method:'DELETE',
+    headers:{
+      'Content-Type':'application/json'
+    },
+    body:JSON.stringify({id})
+  })
+
+  if(userEmail){
+    loadAlerts(userEmail)
+  }
+}
 
   async function saveHistory(
     email: string,
@@ -546,6 +610,49 @@ function selectSuggestion(item: Suggestion) {
           </div>
         </div>
       )}
+      <div className="bg-zinc-900 p-6 rounded mt-10">
+  <h2 className="text-xl font-bold mb-4">
+    가격 알림
+  </h2>
+
+  <div className="flex gap-3 mb-5">
+    <input
+      value={targetPrice}
+      onChange={(e)=>setTargetPrice(e.target.value)}
+      placeholder="예: 30"
+      className="bg-black p-3 rounded flex-1"
+    />
+
+    <button
+      onClick={createAlert}
+      className="bg-yellow-500 text-black px-5 rounded font-bold"
+    >
+      알림 생성
+    </button>
+  </div>
+
+  {alerts.map((item:any)=>(
+    <div
+      key={item.id}
+      className="flex justify-between border-b border-zinc-800 py-3"
+    >
+      <div>
+        <p>{item.apartment_name}</p>
+
+        <p className="text-sm text-zinc-400">
+          {item.target_price}억 이하
+        </p>
+      </div>
+
+      <button
+        onClick={()=>deleteAlert(item.id)}
+        className="text-red-400"
+      >
+        삭제
+      </button>
+    </div>
+  ))}
+</div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
         <div className="bg-zinc-900 p-5 rounded">
