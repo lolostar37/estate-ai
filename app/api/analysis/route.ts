@@ -79,7 +79,47 @@ export async function POST(req: Request) {
       prices.reduce((a: number, b: number) => a + b, 0) / prices.length
 
     const currentPrice = Math.round((avg / 10000) * 10) / 10
+const recentDeals = filtered
+  .slice(0, Math.min(filtered.length, 20))
+  .map((item: any) =>
+    Number(
+      String(item.dealAmount).replaceAll(',', '')
+    ) / 10000
+  )
+
+const recentAverage =
+  recentDeals.length > 0
+    ? recentDeals.reduce(
+        (a:number,b:number)=>a+b,
+        0
+      ) / recentDeals.length
+    : currentPrice
+
+const recentMarketPrice =
+  Math.round(
+    (
+      recentAverage * 0.5 +
+      currentPrice * 0.3 +
+      (
+        currentPrice *
+        (1 + annualGrowthRate)
+      )
+    ) * 0.2
+    *10
+  )/10
+
     const fairValue = Math.round(currentPrice * 0.92 * 10) / 10
+const marketGapRate =
+  Math.round(
+    (
+      (
+        fairValue -
+        recentMarketPrice
+      ) /
+      recentMarketPrice
+    ) *1000
+  ) /10
+
     const bubble = Math.round(((currentPrice - fairValue) / fairValue) * 100)
     const investmentScore = Math.max(0, Math.min(100, 100 - bubble * 3))
 
@@ -117,17 +157,78 @@ export async function POST(req: Request) {
         }
       })
 
-    const firstPrice = pastData[0]?.price || currentPrice
-    const lastPrice = pastData[pastData.length - 1]?.price || currentPrice
+    const yearlyReturns: number[] = []
 
-    const yearCount = Math.max(pastData.length - 1, 1)
+for (let i = 1; i < pastData.length; i++) {
+  const prev = pastData[i - 1].price
+  const curr = pastData[i].price
 
-    const annualGrowthRate =
-      Math.pow(lastPrice / firstPrice, 1 / yearCount) - 1
+  if (prev > 0 && curr > 0) {
+    yearlyReturns.push((curr - prev) / prev)
+  }
+}
 
-    const conservativeRate = annualGrowthRate * 0.5
-    const baseRate = annualGrowthRate
-    const optimisticRate = annualGrowthRate * 1.5
+const averageReturn =
+  yearlyReturns.length > 0
+    ? yearlyReturns.reduce((a, b) => a + b, 0) / yearlyReturns.length
+    : 0
+
+const volatility =
+  yearlyReturns.length > 0
+    ? Math.sqrt(
+        yearlyReturns.reduce(
+          (sum, r) => sum + Math.pow(r - averageReturn, 2),
+          0
+        ) / yearlyReturns.length
+      )
+    : 0
+
+const negativeYears = yearlyReturns.filter((r) => r < 0).length
+
+const negativeRatio =
+  yearlyReturns.length > 0 ? negativeYears / yearlyReturns.length : 0
+
+const recentReturns = yearlyReturns.slice(-3)
+
+const recentMomentum =
+  recentReturns.length > 0
+    ? recentReturns.reduce((a, b) => a + b, 0) / recentReturns.length
+    : averageReturn
+
+const cycleAdjustedReturn =
+  averageReturn * 0.6 + recentMomentum * 0.4
+
+const riskPenalty = volatility * 0.5 + negativeRatio * 0.03
+
+const conservativeRate = Math.max(
+  -0.03,
+  cycleAdjustedReturn - riskPenalty
+)
+
+const baseRate = Math.max(
+  -0.01,
+  cycleAdjustedReturn
+)
+
+const optimisticRate = Math.max(
+  0.01,
+  cycleAdjustedReturn + volatility * 0.5
+)
+
+const annualGrowthRate = baseRate
+
+const forecastConfidence = Math.max(
+  40,
+  Math.min(
+    95,
+    Math.round(
+      90 -
+        volatility * 300 -
+        negativeRatio * 30 +
+        Math.min(pastData.length, 10)
+    )
+  )
+)
 
     const currentYear = today.getFullYear()
 
@@ -175,11 +276,31 @@ export async function POST(req: Request) {
 아파트명: ${search}
 최근 10년 거래건수: ${filtered.length}건
 현재 평균 실거래가: ${currentPrice}억
+<div className="bg-zinc-900 p-5 rounded">
+  <p>현재 추정 시세</p>
+  <h2 className="text-3xl">
+    {metrics.recentMarketPrice}
+  </h2>
+</div>
+
+<div className="bg-zinc-900 p-5 rounded">
+  <p>시세 대비</p>
+  <h2 className="text-3xl">
+    {metrics.marketGapRate}
+  </h2>
+</div>
 AI 적정가 추정: ${fairValue}억
 버블률 추정: ${bubble}%
 투자 점수: ${investmentScore}점
 연평균 성장률 추정: ${(annualGrowthRate * 100).toFixed(2)}%
+변동성:
+${(volatility * 100).toFixed(2)}%
 
+하락 연도 비율:
+${(negativeRatio * 100).toFixed(1)}%
+
+예측 신뢰도:
+${forecastConfidence}점
 5년 뒤 보수 전망: ${after5YearsBear}억
 5년 뒤 중립 전망: ${after5YearsBase}억
 5년 뒤 낙관 전망: ${after5YearsBull}억
@@ -219,21 +340,40 @@ await supabase
   )      return NextResponse.json({
       result: gpt.choices?.[0]?.message?.content || `${search} 분석 완료`,
       metrics: {
-        currentPrice: `${currentPrice}억`,
-        fairValue: `${fairValue}억`,
-        bubbleRate: `${bubble}%`,
-        investmentScore: `${investmentScore}점`,
-        opinion,
-      },
-      chartData: pastData,
+metrics: {
+ currentPrice: `${currentPrice}억`,
+ recentMarketPrice:`${recentMarketPrice}억`,
+ fairValue: `${fairValue}억`,
+ marketGapRate:`${marketGapRate}%`,
+ bubbleRate: `${bubble}%`,
+ investmentScore: `${investmentScore}점`,
+ opinion,
+},
+        chartData: pastData,
       forecastData,
-      forecast: {
-        after5YearsBear,
-        after5YearsBase,
-        after5YearsBull,
-        expectedGrowthRate,
-        annualGrowthRate: Math.round(annualGrowthRate * 1000) / 10,
-      },
+forecast: {
+  after5YearsBear,
+  after5YearsBase,
+  after5YearsBull,
+  expectedGrowthRate,
+
+  annualGrowthRate:
+    Math.round(
+      annualGrowthRate * 1000
+    ) / 10,
+
+  volatility:
+    Math.round(
+      volatility * 1000
+    ) / 10,
+
+  negativeRatio:
+    Math.round(
+      negativeRatio * 1000
+    ) / 10,
+
+  forecastConfidence
+},
     })
   } catch (error) {
     return NextResponse.json({
