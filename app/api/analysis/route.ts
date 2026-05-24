@@ -276,19 +276,6 @@ const forecastConfidence = Math.max(
 아파트명: ${search}
 최근 10년 거래건수: ${filtered.length}건
 현재 평균 실거래가: ${currentPrice}억
-<div className="bg-zinc-900 p-5 rounded">
-  <p>현재 추정 시세</p>
-  <h2 className="text-3xl">
-    {metrics.recentMarketPrice}
-  </h2>
-</div>
-
-<div className="bg-zinc-900 p-5 rounded">
-  <p>시세 대비</p>
-  <h2 className="text-3xl">
-    {metrics.marketGapRate}
-  </h2>
-</div>
 AI 적정가 추정: ${fairValue}억
 버블률 추정: ${bubble}%
 투자 점수: ${investmentScore}점
@@ -349,6 +336,7 @@ metrics: {
  investmentScore: `${investmentScore}점`,
  opinion,
 },
+
         chartData: pastData,
       forecastData,
 forecast: {

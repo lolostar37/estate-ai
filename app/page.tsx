@@ -661,6 +661,19 @@ function selectSuggestion(item: Suggestion) {
         </div>
 
         <div className="bg-zinc-900 p-5 rounded">
+          <div className="bg-zinc-900 p-5 rounded">
+  <p>현재 추정 시세</p>
+  <h2 className="text-3xl">
+    {metrics.recentMarketPrice}
+  </h2>
+</div>
+
+<div className="bg-zinc-900 p-5 rounded">
+  <p>시세 대비</p>
+  <h2 className="text-3xl">
+    {metrics.marketGapRate}
+  </h2>
+</div>
           <p>AI 적정가</p>
           <h2 className="text-3xl">{metrics.fairValue}</h2>
         </div>
