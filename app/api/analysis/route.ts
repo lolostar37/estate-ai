@@ -17,6 +17,7 @@ export async function POST(req: Request) {
 
     const search = body.search || ''
     const district = body.district || '11710'
+    const area = body.area || 'all'
 
     const key = process.env.MOLIT_API_KEY
     const openaiKey = process.env.OPENAI_API_KEY
@@ -55,15 +56,28 @@ export async function POST(req: Request) {
 
     const normalizedSearch = search.replace(/\s/g, '')
 
-    const filtered = allItems.filter((item: any) =>
-      String(item.aptNm || '')
-        .replace(/\s/g, '')
-        .includes(normalizedSearch)
-    )
+    const filtered = allItems.filter((item: any) => {
+  const aptMatch = String(item.aptNm || '')
+    .replace(/\s/g, '')
+    .includes(normalizedSearch)
+
+  if (!aptMatch) {
+    return false
+  }
+
+  if (area === 'all') {
+    return true
+  }
+
+  const itemArea = Number(item.excluUseAr || 0)
+  const targetArea = Number(area)
+
+  return Math.abs(itemArea - targetArea) <= 3
+})
 
     if (filtered.length === 0) {
       return NextResponse.json({
-        result: `${search}의 실거래 데이터를 찾을 수 없습니다.`,
+result: `${search} ${area === 'all' ? '' : `${area}㎡`} 기준의 실거래 데이터를 찾을 수 없습니다.`,
         metrics: {
           currentPrice: '-',
           recentMarketPrice: '-',
@@ -277,6 +291,7 @@ const blendedPrice =
               role: 'user',
               content: `
 아파트명: ${search}
+분석 면적: ${area === 'all' ? '전체 평형' : `${area}㎡ 기준`}
 최근 10년 거래건수: ${filtered.length}건
 
 실거래 평균: ${currentPrice}억
