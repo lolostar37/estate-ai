@@ -229,6 +229,31 @@ const forecastConfidence = Math.max(
     )
   )
 )
+const recentDeals = filtered
+  .slice(0, Math.min(filtered.length, 20))
+  .map((item: any) =>
+    Number(String(item.dealAmount).replaceAll(',', '')) / 10000
+  )
+
+const recentAverage =
+  recentDeals.length > 0
+    ? recentDeals.reduce((a: number, b: number) => a + b, 0) /
+      recentDeals.length
+    : currentPrice
+
+const recentMarketPrice =
+  Math.round(
+    (
+      recentAverage * 0.5 +
+      currentPrice * 0.3 +
+      currentPrice * (1 + annualGrowthRate) * 0.2
+    ) * 10
+  ) / 10
+
+const marketGapRate =
+  Math.round(
+    ((fairValue - recentMarketPrice) / recentMarketPrice) * 1000
+  ) / 10
 
     const currentYear = today.getFullYear()
 
@@ -309,7 +334,9 @@ ${forecastConfidence}점
       }
     )
 
-    const gpt = await gptResponse.json()
+await supabase
+const gpt = await gptResponse.json()
+
 await supabase
   .from('apartments')
   .upsert(
@@ -322,22 +349,63 @@ await supabase
       opinion,
     },
     {
-      onConflict: 'name'
+      onConflict: 'name',
     }
-  )      return NextResponse.json({
-      result: gpt.choices?.[0]?.message?.content || `${search} 분석 완료`,
-      metrics: {
-metrics: {
- currentPrice: `${currentPrice}억`,
- recentMarketPrice:`${recentMarketPrice}억`,
- fairValue: `${fairValue}억`,
- marketGapRate:`${marketGapRate}%`,
- bubbleRate: `${bubble}%`,
- investmentScore: `${investmentScore}점`,
- opinion,
-},
+  )
 
-        chartData: pastData,
+return NextResponse.json({
+  result:
+    gpt.choices?.[0]?.message?.content ||
+    `${search} 분석 완료`,
+
+  metrics: {
+    currentPrice: `${currentPrice}억`,
+    recentMarketPrice: `${recentMarketPrice}억`,
+    fairValue: `${fairValue}억`,
+    marketGapRate: `${marketGapRate}%`,
+    bubbleRate: `${bubble}%`,
+    investmentScore: `${investmentScore}점`,
+    opinion,
+  },
+
+  chartData: pastData,
+  forecastData,
+
+  forecast: {
+    after5YearsBear,
+    after5YearsBase,
+    after5YearsBull,
+    expectedGrowthRate,
+
+    annualGrowthRate:
+      Math.round(
+        annualGrowthRate * 1000
+      ) / 10,
+
+    volatility:
+      Math.round(
+        volatility * 1000
+      ) / 10,
+
+    negativeRatio:
+      Math.round(
+        negativeRatio * 1000
+      ) / 10,
+
+    forecastConfidence,
+  }
+})
+      result: gpt.choices?.[0]?.message?.content || `${search} 분석 완료`,
+     metrics: {
+  currentPrice: `${currentPrice}억`,
+  recentMarketPrice: `${recentMarketPrice}억`,
+  fairValue: `${fairValue}억`,
+  marketGapRate: `${marketGapRate}%`,
+  bubbleRate: `${bubble}%`,
+  investmentScore: `${investmentScore}점`,
+  opinion,
+}, 
+      chartData: pastData,
       forecastData,
 forecast: {
   after5YearsBear,
