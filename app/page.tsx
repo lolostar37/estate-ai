@@ -22,7 +22,11 @@ const supabase = createClient(
 
 type Metrics = {
   currentPrice?: string
+  recentMarketPrice?: string
+  kbPrice?: string
   fairValue?: string
+  blendedPrice?: string
+  marketGapRate?: string
   bubbleRate?: string
   investmentScore?: string
   opinion?: string
@@ -90,6 +94,7 @@ function Gauge({
   return (
     <div className="bg-zinc-900 p-8 rounded">
       <h2 className="text-xl mb-6">{title}</h2>
+
       <div className="w-48 h-48 mx-auto">
         <CircularProgressbar
           value={value}
@@ -109,20 +114,23 @@ export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [district, setDistrict] = useState('11710')
   const [search, setSearch] = useState('')
+  const [area, setArea] = useState('all')
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [favorites, setFavorites] = useState<Favorite[]>([])
   const [history, setHistory] = useState<History[]>([])
+  const [alerts, setAlerts] = useState<any[]>([])
+  const [targetPrice, setTargetPrice] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState('')
   const [chartData, setChartData] = useState<any[]>([])
   const [forecastData, setForecastData] = useState<any[]>([])
   const [forecast, setForecast] = useState<Forecast | null>(null)
-const [alerts, setAlerts] = useState<any[]>([])
-const [targetPrice, setTargetPrice] = useState('')
 
   const [metrics, setMetrics] = useState<Metrics>({
     currentPrice: '-',
+    recentMarketPrice: '-',
     fairValue: '-',
+    marketGapRate: '-',
     bubbleRate: '-',
     investmentScore: '-',
     opinion: '-',
@@ -137,11 +145,10 @@ const [targetPrice, setTargetPrice] = useState('')
       setUserEmail(email)
 
       if (email) {
-loadFavorites(email)
-
-loadHistory(email)
-
-loadAlerts(email)      }
+        loadFavorites(email)
+        loadHistory(email)
+        loadAlerts(email)
+      }
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange(
@@ -150,15 +157,13 @@ loadAlerts(email)      }
         setUserEmail(email)
 
         if (email) {
-loadFavorites(email)
-
-loadHistory(email)
-
-loadAlerts(email)
-loadHistory(email)
+          loadFavorites(email)
+          loadHistory(email)
+          loadAlerts(email)
         } else {
           setFavorites([])
           setHistory([])
+          setAlerts([])
         }
       }
     )
@@ -180,6 +185,7 @@ loadHistory(email)
     setUserEmail(null)
     setFavorites([])
     setHistory([])
+    setAlerts([])
   }
 
   async function loadFavorites(email: string) {
@@ -192,6 +198,12 @@ loadHistory(email)
     const res = await fetch(`/api/history?user_email=${encodeURIComponent(email)}`)
     const data = await res.json()
     if (data.success) setHistory(data.data || [])
+  }
+
+  async function loadAlerts(email: string) {
+    const res = await fetch(`/api/alerts?user_email=${encodeURIComponent(email)}`)
+    const data = await res.json()
+    if (data.success) setAlerts(data.data || [])
   }
 
   async function saveFavorite() {
@@ -233,62 +245,42 @@ loadHistory(email)
 
     if (userEmail) loadHistory(userEmail)
   }
-async function loadAlerts(email: string) {
-  const response = await fetch(
-    `/api/alerts?user_email=${encodeURIComponent(email)}`
-  )
 
-  const data = await response.json()
+  async function createAlert() {
+    if (!userEmail) return alert('로그인 필요')
+    if (!search || !targetPrice) return alert('아파트와 목표가격 입력')
 
-  if (data.success) {
-    setAlerts(data.data || [])
+    const res = await fetch('/api/alerts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_email: userEmail,
+        apartment_name: search,
+        target_price: Number(targetPrice),
+        alert_type: 'below',
+      }),
+    })
+
+    const data = await res.json()
+
+    if (data.success) {
+      alert('알림 저장 완료')
+      loadAlerts(userEmail)
+      setTargetPrice('')
+    } else {
+      alert(data.message || '알림 저장 실패')
+    }
   }
-}
 
-async function createAlert() {
-  if (!userEmail) {
-    return alert('로그인 필요')
+  async function deleteAlert(id: number) {
+    await fetch('/api/alerts', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+
+    if (userEmail) loadAlerts(userEmail)
   }
-
-  if (!search || !targetPrice) {
-    return alert('아파트와 목표가격 입력')
-  }
-
-  const response = await fetch('/api/alerts', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      user_email: userEmail,
-      apartment_name: search,
-      target_price: Number(targetPrice),
-      alert_type: 'below',
-    }),
-  })
-
-  const data = await response.json()
-
-  if (data.success) {
-    alert('알림 저장 완료')
-    loadAlerts(userEmail)
-    setTargetPrice('')
-  }
-}
-
-async function deleteAlert(id:number){
-  await fetch('/api/alerts',{
-    method:'DELETE',
-    headers:{
-      'Content-Type':'application/json'
-    },
-    body:JSON.stringify({id})
-  })
-
-  if(userEmail){
-    loadAlerts(userEmail)
-  }
-}
 
   async function saveHistory(
     email: string,
@@ -341,7 +333,11 @@ async function deleteAlert(id:number){
       const res = await fetch('/api/analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ search: targetSearch, district: targetDistrict }),
+        body: JSON.stringify({
+          search: targetSearch,
+          district: targetDistrict,
+          area,
+        }),
       })
 
       const data = await res.json()
@@ -370,17 +366,18 @@ async function deleteAlert(id:number){
     runAnalyze(search, district)
   }
 
-function selectSuggestion(item: Suggestion) {
-  const code = item.district_code || districtMap[item.name] || district
+  function selectSuggestion(item: Suggestion) {
+    const code = item.district_code || districtMap[item.name] || district
 
-  setSearch(item.name)
-  setDistrict(code)
-  setSuggestions([])
+    setSearch(item.name)
+    setDistrict(code)
+    setSuggestions([])
 
-  setTimeout(() => {
-    runAnalyze(item.name, code)
-  }, 100)
-}
+    setTimeout(() => {
+      runAnalyze(item.name, code)
+    }, 100)
+  }
+
   function openHistory(item: History) {
     setSearch(item.apartment_name)
     setDistrict(item.district)
@@ -403,25 +400,27 @@ function selectSuggestion(item: Suggestion) {
 
     doc.setFontSize(12)
     doc.text(`Apartment: ${search || '-'}`, 20, 40)
-    doc.text(`Average Price: ${metrics.currentPrice || '-'}`, 20, 52)
-    doc.text(`Fair Value: ${metrics.fairValue || '-'}`, 20, 64)
-    doc.text(`Bubble Rate: ${metrics.bubbleRate || '-'}`, 20, 76)
-    doc.text(`Investment Score: ${metrics.investmentScore || '-'}`, 20, 88)
-    doc.text(`AI Opinion: ${metrics.opinion || '-'}`, 20, 100)
+    doc.text(`Area: ${area === 'all' ? 'All' : `${area}m2`}`, 20, 52)
+    doc.text(`Average Price: ${metrics.currentPrice || '-'}`, 20, 64)
+    doc.text(`Estimated Market Price: ${metrics.recentMarketPrice || '-'}`, 20, 76)
+    doc.text(`Fair Value: ${metrics.fairValue || '-'}`, 20, 88)
+    doc.text(`Market Gap: ${metrics.marketGapRate || '-'}`, 20, 100)
+    doc.text(`Bubble Rate: ${metrics.bubbleRate || '-'}`, 20, 112)
+    doc.text(`Investment Score: ${metrics.investmentScore || '-'}`, 20, 124)
+    doc.text(`AI Opinion: ${metrics.opinion || '-'}`, 20, 136)
 
     if (forecast) {
-      doc.text(`5Y Bear: ${forecast.after5YearsBear}억`, 20, 112)
-      doc.text(`5Y Base: ${forecast.after5YearsBase}억`, 20, 124)
-      doc.text(`5Y Bull: ${forecast.after5YearsBull}억`, 20, 136)
-      doc.text(`Expected Growth: ${forecast.expectedGrowthRate}%`, 20, 148)
+      doc.text(`5Y Bear: ${forecast.after5YearsBear}억`, 20, 148)
+      doc.text(`5Y Base: ${forecast.after5YearsBase}억`, 20, 160)
+      doc.text(`5Y Bull: ${forecast.after5YearsBull}억`, 20, 172)
     }
 
     doc.setFontSize(14)
-    doc.text('AI Analysis', 20, 165)
+    doc.text('AI Analysis', 20, 190)
 
     doc.setFontSize(10)
     const lines = doc.splitTextToSize(result || 'No analysis result.', 170)
-    doc.text(lines, 20, 180)
+    doc.text(lines, 20, 205)
 
     doc.save(`${search || 'moveup-ai'}-report.pdf`)
   }
@@ -441,8 +440,8 @@ function selectSuggestion(item: Suggestion) {
           </h1>
 
           <p className="text-zinc-400 text-lg md:text-xl max-w-3xl leading-8">
-            국토부 실거래 데이터를 기반으로 아파트의 평균 거래가, 적정가,
-            버블률, 투자 점수와 향후 5년 가격 전망을 분석합니다.
+            국토부 실거래 데이터를 기반으로 아파트의 평균 거래가, 현재 추정 시세,
+            적정가, 버블률, 투자 점수와 향후 5년 가격 전망을 분석합니다.
           </p>
         </div>
 
@@ -475,38 +474,51 @@ function selectSuggestion(item: Suggestion) {
           onChange={(e) => setDistrict(e.target.value)}
           className="bg-zinc-900 p-4 rounded"
         >
-<option value="11110">종로구</option>
-<option value="11140">중구</option>
-<option value="11170">용산구</option>
-<option value="11200">성동구</option>
-<option value="11215">광진구</option>
-<option value="11230">동대문구</option>
-<option value="11260">중랑구</option>
-<option value="11290">성북구</option>
-<option value="11305">강북구</option>
-<option value="11320">도봉구</option>
-<option value="11350">노원구</option>
-<option value="11380">은평구</option>
-<option value="11410">서대문구</option>
-<option value="11440">마포구</option>
-<option value="11470">양천구</option>
-<option value="11500">강서구</option>
-<option value="11530">구로구</option>
-<option value="11545">금천구</option>
-<option value="11560">영등포구</option>
-<option value="11590">동작구</option>
-<option value="11620">관악구</option>
-<option value="11650">서초구</option>
-<option value="11680">강남구</option>
-<option value="11710">송파구</option>
-<option value="11740">강동구</option>
+          <option value="11110">종로구</option>
+          <option value="11140">중구</option>
+          <option value="11170">용산구</option>
+          <option value="11200">성동구</option>
+          <option value="11215">광진구</option>
+          <option value="11230">동대문구</option>
+          <option value="11260">중랑구</option>
+          <option value="11290">성북구</option>
+          <option value="11305">강북구</option>
+          <option value="11320">도봉구</option>
+          <option value="11350">노원구</option>
+          <option value="11380">은평구</option>
+          <option value="11410">서대문구</option>
+          <option value="11440">마포구</option>
+          <option value="11470">양천구</option>
+          <option value="11500">강서구</option>
+          <option value="11530">구로구</option>
+          <option value="11545">금천구</option>
+          <option value="11560">영등포구</option>
+          <option value="11590">동작구</option>
+          <option value="11620">관악구</option>
+          <option value="11650">서초구</option>
+          <option value="11680">강남구</option>
+          <option value="11710">송파구</option>
+          <option value="11740">강동구</option>
+        </select>
+
+        <select
+          value={area}
+          onChange={(e) => setArea(e.target.value)}
+          className="bg-zinc-900 p-4 rounded"
+        >
+          <option value="all">전체 평형</option>
+          <option value="59">59㎡ / 24평형</option>
+          <option value="74">74㎡ / 30평형</option>
+          <option value="84">84㎡ / 34평형</option>
+          <option value="101">101㎡ / 40평형</option>
+          <option value="114">114㎡ / 45평형</option>
         </select>
 
         <div className="relative flex-1">
           <input
             value={search}
             onChange={(e) => searchApartments(e.target.value)}
-            placeholder="예: 잠실"
+            placeholder="예: 은마, 반포자이, 잠실엘스"
             className="w-full p-4 rounded bg-zinc-900"
           />
 
@@ -520,7 +532,8 @@ function selectSuggestion(item: Suggestion) {
                 >
                   <div className="font-bold">{item.name}</div>
                   <div className="text-sm text-zinc-400">
-{item.district_name || '서울'} · 기준가 {item.current_price}억 · 의견 {item.opinion}                  </div>
+                    {item.district_name || '서울'} · 기준가 {item.current_price}억 · 의견 {item.opinion}
+                  </div>
                 </button>
               ))}
             </div>
@@ -557,9 +570,7 @@ function selectSuggestion(item: Suggestion) {
                     key={item.id}
                     className="bg-black border border-zinc-700 px-4 py-3 rounded flex gap-3 items-center"
                   >
-                    <button
-                      onClick={() => runAnalyze(item.apartment_name, item.district)}
-                    >
+                    <button onClick={() => runAnalyze(item.apartment_name, item.district)}>
                       {item.apartment_name}
                     </button>
 
@@ -610,72 +621,89 @@ function selectSuggestion(item: Suggestion) {
           </div>
         </div>
       )}
-      <div className="bg-zinc-900 p-6 rounded mt-10">
-  <h2 className="text-xl font-bold mb-4">
-    가격 알림
-  </h2>
 
-  <div className="flex gap-3 mb-5">
-    <input
-      value={targetPrice}
-      onChange={(e)=>setTargetPrice(e.target.value)}
-      placeholder="예: 30"
-      className="bg-black p-3 rounded flex-1"
-    />
+      {userEmail && (
+        <div className="bg-zinc-900 p-6 rounded mb-10">
+          <h2 className="text-xl font-bold mb-4">가격 알림</h2>
 
-    <button
-      onClick={createAlert}
-      className="bg-yellow-500 text-black px-5 rounded font-bold"
-    >
-      알림 생성
-    </button>
-  </div>
+          <div className="flex flex-col md:flex-row gap-3 mb-5">
+            <input
+              value={targetPrice}
+              onChange={(e) => setTargetPrice(e.target.value)}
+              placeholder="예: 30"
+              className="bg-black p-3 rounded flex-1"
+            />
 
-  {alerts.map((item:any)=>(
-    <div
-      key={item.id}
-      className="flex justify-between border-b border-zinc-800 py-3"
-    >
-      <div>
-        <p>{item.apartment_name}</p>
+            <button
+              onClick={createAlert}
+              className="bg-yellow-500 text-black px-5 py-3 rounded font-bold"
+            >
+              알림 생성
+            </button>
+          </div>
 
-        <p className="text-sm text-zinc-400">
-          {item.target_price}억 이하
-        </p>
-      </div>
+          {alerts.length === 0 ? (
+            <p className="text-zinc-400">아직 설정된 알림이 없습니다.</p>
+          ) : (
+            alerts.map((item: any) => (
+              <div
+                key={item.id}
+                className="flex justify-between border-b border-zinc-800 py-3"
+              >
+                <div>
+                  <p>{item.apartment_name}</p>
+                  <p className="text-sm text-zinc-400">
+                    {item.target_price}억 이하
+                  </p>
+                </div>
 
-      <button
-        onClick={()=>deleteAlert(item.id)}
-        className="text-red-400"
-      >
-        삭제
-      </button>
-    </div>
-  ))}
-</div>
+                <button
+                  onClick={() => deleteAlert(item.id)}
+                  className="text-red-400"
+                >
+                  삭제
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-9 gap-5">
         <div className="bg-zinc-900 p-5 rounded">
           <p>실거래 평균</p>
           <h2 className="text-3xl">{metrics.currentPrice}</h2>
         </div>
 
         <div className="bg-zinc-900 p-5 rounded">
-          <div className="bg-zinc-900 p-5 rounded">
-  <p>현재 추정 시세</p>
+          <p>현재 추정 시세</p>
+          <h2 className="text-3xl">{metrics.recentMarketPrice}</h2>
+        </div>
+
+<div className="bg-zinc-900 p-5 rounded">
+  <p>KB 추정 시세</p>
   <h2 className="text-3xl">
-    {metrics.recentMarketPrice}
+    {metrics.kbPrice}
   </h2>
 </div>
 
 <div className="bg-zinc-900 p-5 rounded">
-  <p>시세 대비</p>
+  <p>AI 적정가</p>
   <h2 className="text-3xl">
-    {metrics.marketGapRate}
+    {metrics.fairValue}
   </h2>
 </div>
-          <p>AI 적정가</p>
-          <h2 className="text-3xl">{metrics.fairValue}</h2>
+
+<div className="bg-zinc-900 p-5 rounded">
+  <p>통합 AI 시세</p>
+  <h2 className="text-3xl text-green-400">
+    {metrics.blendedPrice}
+  </h2>
+</div>
+
+        <div className="bg-zinc-900 p-5 rounded">
+          <p>시세 대비</p>
+          <h2 className="text-3xl">{metrics.marketGapRate}</h2>
         </div>
 
         <div className="bg-zinc-900 p-5 rounded">
@@ -766,24 +794,9 @@ function selectSuggestion(item: Suggestion) {
             <XAxis dataKey="year" />
             <YAxis />
             <Tooltip />
-            <Line
-              type="monotone"
-              dataKey="conservative"
-              stroke="#94a3b8"
-              strokeWidth={2}
-            />
-            <Line
-              type="monotone"
-              dataKey="base"
-              stroke="#eab308"
-              strokeWidth={3}
-            />
-            <Line
-              type="monotone"
-              dataKey="optimistic"
-              stroke="#22c55e"
-              strokeWidth={2}
-            />
+            <Line type="monotone" dataKey="conservative" stroke="#94a3b8" strokeWidth={2} />
+            <Line type="monotone" dataKey="base" stroke="#eab308" strokeWidth={3} />
+            <Line type="monotone" dataKey="optimistic" stroke="#22c55e" strokeWidth={2} />
           </LineChart>
         </ResponsiveContainer>
 
